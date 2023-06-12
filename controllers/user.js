@@ -1,0 +1,156 @@
+import User from "../models/user.js";
+import bcrypt from "bcrypt";
+import jwt from "jsonwebtoken";
+import CheckIn from "../models/checkIn.js";
+import dotenv from "dotenv";
+import Leave from "../models/leaves.js";
+
+dotenv.config();
+
+export const userRegistration = async (req, res) => {
+  console.log("inside signup");
+  // console.log(process.env.JWT_SECRET);
+
+  // getting the username, email and password from the body
+  const { name, email, password } = req.body;
+
+  try {
+    const existinguser = await User.findOne({ email });
+    if (existinguser) {
+      return res.status(404).json({ message: "User already Exist." }); // if
+    }
+
+    // If user doesn't exist , create a new user
+    const hashedPassword = await bcrypt.hash(password, 12);
+
+    // newUser database mein
+    const newUser = await User.create({
+      name,
+      email,
+      password: hashedPassword,
+    });
+
+    // Generate one token
+    const token = jwt.sign(
+      { email: newUser.email, id: newUser._id },
+      process.env.JWT_SECRET,
+      { expiresIn: "1h" }
+    );
+
+    res.cookie("token", token, {
+      httpOnly: true,
+      // expires: new Date(Date.now() + 600 * 1000),
+    });
+
+    res.json({
+      success: true,
+      message: "user registered successfully",
+    });
+  } catch (error) {
+    res.status(500).json({ error: error.message });
+  }
+};
+
+// function to check in
+export const checkIn = async (req, res) => {
+  // if some user try to check in through email
+  const { email } = req.body;
+
+  try {
+    // Find the user by their email
+    const user = await User.findOne({ email });
+    const userId = user._id;
+
+    if (!user) {
+      return res.status(404).json({ message: "User not found." });
+    }
+
+    // Get the current date
+
+    const currentDate = new Date().toLocaleDateString();
+    const currentTime = new Date().toLocaleTimeString();
+
+    console.log(currentDate);
+    console.log(currentTime);
+
+    // Check if a check-in record exists for the user and current date
+    const checkInRecord = await CheckIn.findOne({
+      user: userId,
+      date: currentDate,
+    });
+
+    if (checkInRecord) {
+      return res
+        .status(400)
+        .json({ message: "User has already checked in for today." });
+    }
+
+    //if the user hasn't check in for today then create the new checkIn record as he is trying to checkIn
+    // Create a new check-in record
+    const newCheckInRecord = await CheckIn.create({
+      user: userId,
+      date: currentDate,
+      checkInTime: currentTime,
+      checkIn: true,
+    });
+
+    res.status(200).json({
+      message: "Check-in successful.",
+      checkInRecord: newCheckInRecord,
+    });
+
+  } catch (error) {
+    res.status(500).json({ error: error.message });
+  }
+};
+
+// Function to mark the user as absent if no check-in entry exists on a specific day
+
+// Function to update absent list and get total absent days
+export const updateAbsent= async (req, res) => {
+  const { email } = req.body;
+
+  try {
+    const user = await User.findOne({ email });
+    const userId = user._id;
+
+    if (!user) {
+      return res.status(404).json({ message: "User not found." });
+    }
+
+    const currentDate = new Date().toLocaleDateString();
+    const currentTime = new Date().toLocaleTimeString();
+
+    console.log(currentDate);
+    console.log(currentTime);
+
+    const checkInRecord = await CheckIn.findOne({
+      user: userId,
+      date: currentDate,
+    });
+
+    if (checkInRecord) {
+      return res
+        .status(400)
+        .json({ message: "User has already checked in for today." });
+    } else {
+      user.absent += 1;
+      await user.save();
+    }
+
+    console.log(user.absent);
+
+    res.status(200).json({
+      absent: user.absent,
+    });
+
+  } catch (error) {
+    res.status(500).json({ error: error.message });
+  }
+};
+
+// // Usage example
+// const userId = "user123"; // Replace with the actual user ID
+// const date = new Date(); // Replace with the specific date to check
+
+// markUserAbsent(userId, date);
