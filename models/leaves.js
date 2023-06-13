@@ -22,7 +22,10 @@ const leaveSchema = new mongoose.Schema({
     ],
     required: true,
   },
-  
+  isApproved:{
+    type: Boolean,
+    default: false,
+  },
   startDate: {
     type: Date,
     required: true,

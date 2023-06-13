@@ -3,7 +3,6 @@ import bcrypt from "bcrypt";
 import jwt from "jsonwebtoken";
 import CheckIn from "../models/checkIn.js";
 import dotenv from "dotenv";
-import Leave from "../models/leaves.js";
 
 dotenv.config();
 
@@ -37,9 +36,11 @@ export const userRegistration = async (req, res) => {
       { expiresIn: "1h" }
     );
 
+    // console.log(token);
+
     res.cookie("token", token, {
       httpOnly: true,
-      // expires: new Date(Date.now() + 600 * 1000),
+      expiresIn: "1h",
     });
 
     res.json({
@@ -70,8 +71,8 @@ export const checkIn = async (req, res) => {
     const currentDate = new Date().toLocaleDateString();
     const currentTime = new Date().toLocaleTimeString();
 
-    console.log(currentDate);
-    console.log(currentTime);
+    // console.log(currentDate);
+    // console.log(currentTime);
 
     // Check if a check-in record exists for the user and current date
     const checkInRecord = await CheckIn.findOne({
@@ -98,17 +99,22 @@ export const checkIn = async (req, res) => {
       message: "Check-in successful.",
       checkInRecord: newCheckInRecord,
     });
-
   } catch (error) {
     res.status(500).json({ error: error.message });
   }
 };
 
-// Function to mark the user as absent if no check-in entry exists on a specific day
+// Function to mark the user as absent if no check-in entry exists on a specific day and  update absent list and get total absent days
 
-// Function to update absent list and get total absent days
-export const updateAbsent= async (req, res) => {
-  const { email } = req.body;
+export const updateAbsent = async (req, res) => {
+  // console.log("inside updateAbsent");
+
+  // whenever the user signup then it will create a token and that token is used here for the updation of absent
+  const { token } = req.cookies;
+
+  const { email } = jwt.verify(token, process.env.JWT_SECRET);
+
+  console.log(email);
 
   try {
     const user = await User.findOne({ email });
@@ -121,36 +127,32 @@ export const updateAbsent= async (req, res) => {
     const currentDate = new Date().toLocaleDateString();
     const currentTime = new Date().toLocaleTimeString();
 
-    console.log(currentDate);
-    console.log(currentTime);
+    // console.log(currentDate);
+    // console.log(currentTime);
 
     const checkInRecord = await CheckIn.findOne({
       user: userId,
       date: currentDate,
     });
 
-    if (checkInRecord) {
+    const checkInDeadline = new Date();
+    checkInDeadline.setHours(10, 0, 0); // Set the deadline to 10:00 am
+
+    // If a user doesn't checkIn before 10 am on a particular day he/she will be counted as absent
+
+    if (currentTime > checkInDeadline.toLocaleTimeString()) {
+      user.absent += 1;
+      await user.save();
+    } else if (checkInRecord) {
       return res
         .status(400)
         .json({ message: "User has already checked in for today." });
-    } else {
-      user.absent += 1;
-      await user.save();
     }
-
-    console.log(user.absent);
 
     res.status(200).json({
       absent: user.absent,
     });
-
   } catch (error) {
     res.status(500).json({ error: error.message });
   }
 };
-
-// // Usage example
-// const userId = "user123"; // Replace with the actual user ID
-// const date = new Date(); // Replace with the specific date to check
-
-// markUserAbsent(userId, date);

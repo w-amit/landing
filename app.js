@@ -4,7 +4,7 @@ import cookieParser from "cookie-parser";
 import { connectDB } from "./data/database.js";
 import cors from "cors";
 import dotenv from "dotenv";
-import { checkIn, userRegistration } from "./controllers/user.js";
+import { checkIn, updateAbsent, userRegistration } from "./controllers/user.js";
 import { newLeave, countAllLeaveForUser } from "./controllers/leaves.js";
 
 const app = express();
@@ -43,9 +43,11 @@ app.post("/leave/new", newLeave);
 app.get("/leave/record", countAllLeaveForUser);
 
 // when user doesn't check in on a particular day then it will be counted as absent
-// app.get("/checkin", absent);
+
 
 app.post("/checkin", checkIn);
+
+app.get("/absent", updateAbsent);
 
 app.listen(process.env.PORT, () => {
   console.log("Server is running");
